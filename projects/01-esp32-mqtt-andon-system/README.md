@@ -374,8 +374,8 @@ MIT License - Você pode usar, modificar e distribuir livremente
 ## 👤 Autor
 
 **Matheus Garcia**
-- 🏢 Senior Automation Engineer @ Kohler Co.
-- 🎯 Global Focal Point - Digital Transformation & Innovation
+- 🏢 Senior Automation Engineer.
+- 🎯 Digital Transformation & Innovation
 - 🌍 São Paulo, Brazil
 
 **Expertise:**
