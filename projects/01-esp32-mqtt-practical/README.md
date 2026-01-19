@@ -29,6 +29,21 @@ Base: `lab/line1/m1/`
 - Diagram: `diagrams/phase0-local.png`
 - Evidence: `screenshots/` (MQTT Explorer + Node-RED flow + sample data)
 
+## Mosquitto — Local Broker Validation
+**Service status**
+- `sc query mosquitto` → RUNNING
+
+**Test (publish/subscribe)**
+Terminal A (subscriber):
+- `mosquitto_sub -h localhost -t "lab/test" -v`
+
+Terminal B (publisher):
+- `mosquitto_pub -h localhost -t "lab/test" -m "ok"`
+
+**Evidence**
+- `screenshots/mosquitto-local-test.png`
+
+
 ## Next Phases
 - Phase 1: ESP32 connects locally and publishes telemetry/health
 - Phase 2: Dashboard (Node-RED Dashboard or Grafana)
