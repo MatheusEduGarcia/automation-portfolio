@@ -1,0 +1,31 @@
+[
+    {
+        "id": "6a6bc0826d892a2b",
+        "type": "function",
+        "z": "14888128ce834693",
+        "name": "Machine Simulator (state/cycle/speed/ts)",
+        "func": "// Outputs:\n// 1) state topic\n// 2) cycle_count topic\n// 3) speed topic\n// 4) ts topic\n\nconst base = \"lab/line1/m1/telemetry/\";\n\nlet st = flow.get(\"sim\") || {\n  state: \"STOP\",\n  cycle: 0,\n  speed: 0,\n  lastChange: Date.now()\n};\n\n// Optional manual override\nif (msg.topic === \"force_state\" && typeof msg.payload === \"string\") {\n  st.state = msg.payload.toUpperCase();\n  st.lastChange = Date.now();\n}\n\n// Automatic behavior (simple)\n// If no forced change, flip STOP->RUN every ~20s, and inject FAULT rarely.\nif (msg.topic !== \"force_state\") {\n  const now = Date.now();\n  const dt = now - st.lastChange;\n\n  // Rare fault every ~90-120s (approx)\n  const faultChance = Math.random();\n  if (faultChance > 0.995) {\n    st.state = \"FAULT\";\n    st.lastChange = now;\n  }\n\n  // Recover from FAULT to STOP after ~10s\n  if (st.state === \"FAULT\" && dt > 10000) {\n    st.state = \"STOP\";\n    st.lastChange = now;\n  }\n\n  // Toggle STOP<->RUN every ~20s when not FAULT\n  if (st.state !== \"FAULT\" && dt > 20000) {\n    st.state = (st.state === \"RUN\") ? \"STOP\" : \"RUN\";\n    st.lastChange = now;\n  }\n}\n\n// Update counters\nif (st.state === \"RUN\") {\n  st.cycle += 1;\n  st.speed = Math.round((50 + Math.random() * 20) * 10) / 10; // 50..70\n} else if (st.state === \"STOP\") {\n  st.speed = 0;\n} else if (st.state === \"FAULT\") {\n  st.speed = 0;\n}\n\nflow.set(\"sim\", st);\n\nconst ts = new Date().toISOString();\n\nconst m1 = { topic: base + \"state\", payload: st.state, qos: 0, retain: false };\nconst m2 = { topic: base + \"cycle_count\", payload: st.cycle, qos: 0, retain: false };\nconst m3 = { topic: base + \"speed\", payload: st.speed, qos: 0, retain: false };\nconst m4 = { topic: base + \"ts\", payload: ts, qos: 0, retain: false };\n\nreturn [m1, m2, m3, m4];",
+        "outputs": 4,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 200,
+        "wires": [
+            [
+                "12d51a8bafd0d254"
+            ],
+            [
+                "d683925514fcaf6e"
+            ],
+            [
+                "741628a2b367346b"
+            ],
+            [
+                "5191ce482bdd9267"
+            ]
+        ]
+    }
+]
