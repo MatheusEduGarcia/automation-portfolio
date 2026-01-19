@@ -36,6 +36,13 @@ Base: `lab/line1/m1/`
 - Diagram: `diagrams/phase0-local.png`
 - Evidence folder: `screenshots/`
 
+- **Phase 0 Evidence**
+- `screenshots/mqtt-explorer-local-telemetry.png`
+- `screenshots/node-red-flow-snapshot.png`
+
+**Flow**
+- `projects/02-node-red-flows/flows/flow-simulator-v1.json`
+
 ## Mosquitto — Local Broker Validation
 **Service status**
 - Command: `sc query mosquitto`
