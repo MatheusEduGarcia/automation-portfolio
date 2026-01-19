@@ -3,6 +3,13 @@
 ## Objective
 Build a practical MQTT pipeline starting locally (PC broker + Node-RED machine signal simulator), then connect an ESP32, and finally migrate to HiveMQ Cloud without changing the topic structure.
 
+## Scope
+**Phase 0 (Local):**
+- Mosquitto running on PC
+- Node-RED simulating machine signals and publishing MQTT telemetry
+- Validation with MQTT Explorer
+- Evidence captured (screenshots + flow export + diagram)
+
 ## Architecture — Phase 0 (Local)
 **Components**
 - Mosquitto (MQTT Broker) on PC
@@ -27,11 +34,12 @@ Base: `lab/line1/m1/`
 ## Deliverables
 - Node-RED flow export: `projects/02-node-red-flows/flows/flow-simulator-v1.json`
 - Diagram: `diagrams/phase0-local.png`
-- Evidence: `screenshots/` (MQTT Explorer + Node-RED flow + sample data)
+- Evidence folder: `screenshots/`
 
 ## Mosquitto — Local Broker Validation
 **Service status**
-- `sc query mosquitto` → RUNNING
+- Command: `sc query mosquitto`
+- Expected: `STATE: 4 RUNNING`
 
 **Test (publish/subscribe)**
 Terminal A (subscriber):
@@ -43,6 +51,13 @@ Terminal B (publisher):
 **Evidence**
 - `screenshots/mosquitto-local-test.png`
 
+## Phase 0 — Acceptance Criteria
+- Mosquitto service running locally
+- Pub/Sub test completed successfully
+- MQTT Explorer connects to `localhost:1883`
+- Node-RED publishes telemetry to the topic convention above
+- Flow exported to `projects/02-node-red-flows/flows/flow-simulator-v1.json`
+- Diagram + screenshots stored in the project folders
 
 ## Next Phases
 - Phase 1: ESP32 connects locally and publishes telemetry/health
