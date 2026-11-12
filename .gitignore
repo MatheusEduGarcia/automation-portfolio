@@ -1,0 +1,11 @@
+# Firmware credentials (copy secrets.example.h to secrets.h)
+secrets.h
+
+# Node-RED local data
+.node-red/
+flows_cred.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
