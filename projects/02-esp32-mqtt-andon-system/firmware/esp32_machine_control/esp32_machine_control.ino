@@ -9,10 +9,10 @@
 // =======================
 // CONFIGURACOES WIFI/MQTT
 // =======================
-static const char* WIFI_SSID  = "GSEU_WIFI";
-static const char* WIFI_PASS  = "SUA_SENHA";
+// Wi-Fi and broker settings live in secrets.h (not committed).
+// Copy secrets.example.h to secrets.h and fill in your values.
+#include "secrets.h"
 
-static const char* BROKER_HOST = "1192.168.0.10";
 static const uint16_t BROKER_PORT = 1883;
 
 static const char* TOPIC_BASE = "lab/line1/m1";

@@ -4,11 +4,10 @@
 // =======================
 // WIFI + MQTT SETTINGS
 // =======================
-const char* WIFI_SSID = "SEU_WIFI";
-const char* WIFI_PASS = "SUA_SENHA";
+// Wi-Fi and broker settings live in secrets.h (not committed).
+// Copy secrets.example.h to secrets.h and fill in your values.
+#include "secrets.h"
 
-// IP do seu PC (Mosquitto). Ex: "192.168.0.10"
-const char* BROKER_HOST = "192.168.0.10";
 const uint16_t BROKER_PORT = 1883;
 
 // Base topic do projeto

@@ -6,7 +6,7 @@
 ![Node-RED](https://img.shields.io/badge/Node--RED-v3.0+-red?logo=nodered)
 ![MQTT](https://img.shields.io/badge/MQTT-v3.1.1-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
+![Status](https://img.shields.io/badge/Status-Lab%20prototype-blue)
 
 ---
 
@@ -126,7 +126,8 @@ Este sistema é ideal para:
 
 ### 1️⃣ Upload Firmware ESP32
 ```bash
-1. Abra: firmware/esp32_machine_control.ino
+1. Abra: firmware/esp32_machine_control/esp32_machine_control.ino
+   (copie `secrets.example.h` para `secrets.h` na mesma pasta e preencha Wi-Fi e IP do broker)
 2. Edite WiFi SSID e senha (linhas 12-14)
 3. Edite IP do broker MQTT (linha 16)
 4. Tools → Board → ESP32 Dev Module
@@ -137,7 +138,7 @@ Este sistema é ideal para:
 ```bash
 1. Abra Node-RED: http://localhost:1880
 2. Menu → Import → Clipboard
-3. Cole o conteúdo de: node-red/andon_tower_flow.json
+3. Cole o conteúdo de: flows/andon_tower_flow.json
 4. Deploy
 ```
 
@@ -252,14 +253,14 @@ Tab: Andon System
 
 ### Mudar Base do Tópico MQTT
 ```cpp
-// No firmware ESP32 (linha 17)
+// No firmware ESP32
 static const char* TOPIC_BASE = "lab/line1/m1";
 // Mude para: "fabrica/linha2/torno1"
 ```
 
 ### Ajustar Debounce dos Botões
 ```cpp
-// No firmware ESP32 (linha 55)
+// No firmware ESP32
 static const uint32_t DEBOUNCE_MS = 50;
 // Aumente se houver bouncing
 ```
@@ -363,7 +364,7 @@ Contribuições são bem-vindas! Para contribuir:
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](../../LICENSE) para mais detalhes.
 
 ```
 MIT License - Você pode usar, modificar e distribuir livremente

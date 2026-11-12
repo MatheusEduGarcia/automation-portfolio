@@ -301,14 +301,14 @@ LED DEFECT (Amarelo):
 
 ### Passo 1: Preparar o Firmware
 
-1. **Baixe o arquivo**: `firmware/esp32_machine_control.ino`
+1. **Baixe o arquivo**: `firmware/esp32_machine_control/esp32_machine_control.ino` (e copie `secrets.example.h` para `secrets.h`)
 
 2. **Abra no Arduino IDE**
 
-3. **Edite as configurações** (linhas 12-16):
+3. **Edite as configurações em `secrets.h`** (esse arquivo fica fora do git, veja `.gitignore`):
 
 ```cpp
-// SUAS CREDENCIAIS
+// secrets.h: SUAS CREDENCIAIS
 static const char* WIFI_SSID  = "SEU_WIFI_AQUI";
 static const char* WIFI_PASS  = "SUA_SENHA_AQUI";
 
@@ -458,7 +458,7 @@ node-red
 
 2. Selecione: **Import → Clipboard**
 
-3. **Abra o arquivo**: `node-red/andon_tower_flow.json`
+3. **Abra o arquivo**: `flows/andon_tower_flow.json`
 
 4. **Copie TODO o conteúdo** (Ctrl+A, Ctrl+C)
 
