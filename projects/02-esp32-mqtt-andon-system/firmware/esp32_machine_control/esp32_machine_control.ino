@@ -15,7 +15,10 @@
 
 static const uint16_t BROKER_PORT = 1883;
 
-static const char* TOPIC_BASE = "lab/line1/m1";
+static const char* TOPIC_BASE = "lab/line1/m2";
+
+// Ideal cycle time used for OEE performance (seconds per part)
+static const float IDEAL_CYCLE_S = 10.0f;
 
 // =======================
 // MAPEAMENTO DE IO
@@ -45,6 +48,7 @@ struct MachineState {
   uint32_t defectCount;   // Contador de defeitos
   uint32_t startTime;     // Timestamp do start
   uint32_t totalRuntime;  // Runtime acumulado (ms)
+  uint32_t shiftStart;    // Inicio do turno (ms), base do tempo planejado
 } machine;
 
 // =======================
@@ -78,13 +82,14 @@ String t_led_state(const char* name) { return String(TOPIC_BASE) + "/led/" + nam
 String t_led_set(const char* name)   { return String(TOPIC_BASE) + "/led/" + name + "/set"; }
 String t_metrics()                   { return String(TOPIC_BASE) + "/metrics"; }
 String t_status()                    { return String(TOPIC_BASE) + "/status"; }
+String t_cmd_reset()                 { return String(TOPIC_BASE) + "/cmd/reset"; }
 
 // =======================
 // FUNCOES AUXILIARES
 // =======================
 void buildClientId() {
   uint64_t mac = ESP.getEfuseMac();
-  snprintf(clientId, sizeof(clientId), "esp32-m1-%08X", (uint32_t)mac);
+  snprintf(clientId, sizeof(clientId), "esp32-m2-%08X", (uint32_t)mac);
 }
 
 bool ensureWiFi() {
@@ -133,25 +138,44 @@ void publishLedState(const char* led, bool state) {
   mqtt.publish(t_led_state(led).c_str(), payload, true);  // retained
 }
 
+// Runtime in seconds, including the current run
+uint32_t runtimeSeconds() {
+  uint32_t ms = machine.totalRuntime;
+  if (machine.running && machine.startTime > 0) ms += millis() - machine.startTime;
+  return ms / 1000;
+}
+
+float qualityRatio() {
+  if (machine.cycleCount == 0) return 1.0f;
+  return (float)(machine.cycleCount - machine.defectCount) / machine.cycleCount;
+}
+
+// OEE = Availability x Performance x Quality
+//   Availability = run time / planned time (time since shift start)
+//   Performance  = (parts x ideal cycle time) / run time, capped at 100 %
+//   Quality      = good parts / total parts
 void publishMetrics() {
-  // Calcular runtime atual se maquina rodando
-  uint32_t currentRuntime = 0;
-  if (machine.running && machine.startTime > 0) {
-    currentRuntime = (millis() - machine.startTime) / 1000;  // segundos
-  }
-  
-  // Criar JSON com metricas
-  char json[256];
+  uint32_t runtime = runtimeSeconds();
+  uint32_t planned = (millis() - machine.shiftStart) / 1000;
+
+  float availability = planned > 0 ? (float)runtime / planned : 0.0f;
+  float performance  = runtime > 0 ? (machine.cycleCount * IDEAL_CYCLE_S) / runtime : 0.0f;
+  if (availability > 1.0f) availability = 1.0f;
+  if (performance  > 1.0f) performance  = 1.0f;
+  float quality = qualityRatio();
+  float oee = availability * performance * quality;
+
+  char json[320];
   snprintf(json, sizeof(json),
-    "{\"running\":%s,\"cycles\":%lu,\"defects\":%lu,\"runtime\":%lu,\"quality\":%.1f}",
+    "{\"running\":%s,\"cycles\":%lu,\"defects\":%lu,\"runtime\":%lu,\"planned\":%lu,"
+    "\"availability\":%.1f,\"performance\":%.1f,\"quality\":%.1f,\"oee\":%.1f}",
     machine.running ? "true" : "false",
-    machine.cycleCount,
-    machine.defectCount,
-    (machine.totalRuntime / 1000) + currentRuntime,
-    machine.cycleCount > 0 ? 
-      ((machine.cycleCount - machine.defectCount) * 100.0 / machine.cycleCount) : 100.0
-  );
-  
+    (unsigned long)machine.cycleCount,
+    (unsigned long)machine.defectCount,
+    (unsigned long)runtime,
+    (unsigned long)planned,
+    availability * 100.0f, performance * 100.0f, quality * 100.0f, oee * 100.0f);
+
   mqtt.publish(t_metrics().c_str(), json, true);
 }
 
@@ -200,8 +224,8 @@ void handleStop() {
     setLED(1, true);   // Stop vermelho ON
     setLED(2, false);  // Output OFF
     
-    Serial.printf("MAQUINA PARADA | Runtime: %lu s\n", 
-                  machine.totalRuntime / 1000);
+    Serial.printf("MAQUINA PARADA | Runtime: %lu s\n",
+                  (unsigned long)(machine.totalRuntime / 1000));
     publishMetrics();
   }
 }
@@ -215,26 +239,27 @@ void handleOutput() {
     machine.outputActive = !machine.outputActive;
     setLED(2, machine.outputActive);
     
-    Serial.printf("OUTPUT #%lu | Qualidade: %.1f%%\n", 
-                  machine.cycleCount,
-                  machine.cycleCount > 0 ? 
-                    ((machine.cycleCount - machine.defectCount) * 100.0 / machine.cycleCount) : 100.0);
+    Serial.printf("OUTPUT #%lu | Qualidade: %.1f%%\n",
+                  (unsigned long)machine.cycleCount, qualityRatio() * 100.0f);
     
     publishMetrics();
   }
 }
 
 void handleDefect() {
-  // Incrementar contador
+  // A defect flags one part that was already produced, so defects can never
+  // exceed cycles (keeps Quality between 0 and 100 %)
+  if (machine.defectCount >= machine.cycleCount) {
+    Serial.println("DEFEITO ignorado: nenhuma peca boa para marcar");
+    return;
+  }
   machine.defectCount++;
   
   // Ligar LED defeito
   setLED(3, true);
   
-  Serial.printf("DEFEITO #%lu | Qualidade: %.1f%%\n", 
-                machine.defectCount,
-                machine.cycleCount > 0 ? 
-                  ((machine.cycleCount - machine.defectCount) * 100.0 / machine.cycleCount) : 0.0);
+  Serial.printf("DEFEITO #%lu | Qualidade: %.1f%%\n",
+                (unsigned long)machine.defectCount, qualityRatio() * 100.0f);
   
   publishMetrics();
 }
@@ -242,8 +267,20 @@ void handleDefect() {
 // =======================
 // MQTT CALLBACK
 // =======================
+void resetShift() {
+  bool wasRunning = machine.running;
+  machine.cycleCount = 0;
+  machine.defectCount = 0;
+  machine.totalRuntime = 0;
+  machine.shiftStart = millis();
+  machine.startTime = wasRunning ? millis() : 0;
+  Serial.println("TURNO REINICIADO (contadores e OEE zerados)");
+  publishMetrics();
+}
+
 void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   String t(topic);
+  if (t == t_cmd_reset()) { resetShift(); return; }
   String prefix = String(TOPIC_BASE) + "/led/";
   
   if (!t.startsWith(prefix)) return;
@@ -291,6 +328,7 @@ bool ensureMQTT() {
   for (int i = 0; i < NUM_IO; i++) {
     mqtt.subscribe(t_led_set(NOMES[i]).c_str(), 0);
   }
+  mqtt.subscribe(t_cmd_reset().c_str(), 0);
 
   // Publicar status online e estados iniciais
   publishStatus("online");
@@ -329,7 +367,8 @@ void initIO() {
   machine.defectCount = 0;
   machine.startTime = 0;
   machine.totalRuntime = 0;
-  
+  machine.shiftStart = millis();
+
   digitalWrite(LED_STOP, HIGH);  // Vermelho ON
   
   Serial.println("I/O configurado!\n");
@@ -400,7 +439,7 @@ void setup() {
   delay(500);
 
   Serial.println("\n========================================");
-  Serial.println("  ESP32 Machine Control - v2.0");
+  Serial.println("  ESP32 Machine Control - v2.1 (OEE)");
   Serial.println("  Start/Stop/Output/Defect com Logica");
   Serial.println("========================================\n");
 

@@ -1,0 +1,554 @@
+[
+  {
+    "id": "lab_broker",
+    "type": "mqtt-broker",
+    "name": "Lab broker",
+    "broker": "${MQTT_HOST}",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "30",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "closeTopic": "",
+    "willTopic": "",
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "tab_ui_02",
+    "type": "ui_tab",
+    "name": "02 Andon + OEE",
+    "icon": "dashboard",
+    "order": 2,
+    "disabled": false,
+    "hidden": false
+  },
+  {
+    "id": "grp_02_tower",
+    "type": "ui_group",
+    "name": "Andon tower",
+    "tab": "tab_ui_02",
+    "order": 1,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "grp_02_oee",
+    "type": "ui_group",
+    "name": "OEE",
+    "tab": "tab_ui_02",
+    "order": 2,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "grp_02_cnt",
+    "type": "ui_group",
+    "name": "Shift counters",
+    "tab": "tab_ui_02",
+    "order": 3,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "tab_02",
+    "type": "tab",
+    "label": "02 ESP32 Andon + OEE",
+    "disabled": false,
+    "info": "Andon tower and OEE dashboard for firmware/esp32_machine_control.\nBase topic: lab/line1/m2\nSet SIMULATE_DEVICE=true to run a virtual machine with the same topics and OEE math."
+  },
+  {
+    "type": "ui_template",
+    "group": "grp_02_tower",
+    "name": "Andon tower",
+    "order": 1,
+    "width": 6,
+    "height": 9,
+    "format": "<div class=\"andon\">\n  <div class=\"tower\">\n    <div class=\"lamp red\"    ng-class=\"{on: msg.payload.state === 'red'}\"></div>\n    <div class=\"lamp yellow\" ng-class=\"{on: msg.payload.state === 'yellow'}\"></div>\n    <div class=\"lamp green\"  ng-class=\"{on: msg.payload.state === 'green'}\"></div>\n    <div class=\"pole\"></div>\n    <div class=\"base\"></div>\n  </div>\n  <div class=\"label\" ng-class=\"msg.payload.state\">{{msg.payload.text || 'WAITING FOR DATA'}}</div>\n</div>\n<style>\n.andon { text-align: center; padding: 8px 0; }\n.andon .tower { display: inline-block; padding: 12px 14px 0; background: #1b1b1b; border-radius: 14px; }\n.andon .lamp { width: 96px; height: 96px; border-radius: 50%; margin: 8px auto; background: #2d2d2d;\n               border: 4px solid #111; transition: all .3s ease; }\n.andon .lamp.red.on    { background: radial-gradient(circle, #ff3b30, #a40000); box-shadow: 0 0 36px #ff3b30; animation: pulse 1s infinite; }\n.andon .lamp.yellow.on { background: radial-gradient(circle, #ffe600, #c7a800); box-shadow: 0 0 36px #ffe600; animation: pulse 1s infinite; }\n.andon .lamp.green.on  { background: radial-gradient(circle, #34c759, #0b7a2a); box-shadow: 0 0 36px #34c759; }\n.andon .pole { width: 26px; height: 46px; margin: 0 auto; background: linear-gradient(to right, #444, #222); }\n.andon .base { width: 96px; height: 16px; margin: 0 auto; background: #111; border-radius: 8px; }\n.andon .label { margin-top: 14px; font-size: 20px; font-weight: 600; letter-spacing: .5px; color: #888; }\n.andon .label.red { color: #ff3b30; } .andon .label.yellow { color: #ffcc00; } .andon .label.green { color: #34c759; }\n@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }\n</style>\n",
+    "storeOutMessages": true,
+    "fwdInMessages": false,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "className": "",
+    "id": "n0041",
+    "z": "tab_02",
+    "x": 880,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "type": "function",
+    "name": "Andon logic",
+    "func": "// Andon colour, highest priority first:\n//   grey   = device offline (LWT)\n//   yellow = defect LED on (problem)\n//   green  = machine running\n//   red    = machine stopped\nconst ctx = context.get(\"s\") || { online: false, running: false, defect: false };\nconst t = msg.topic;\nif (t.endsWith(\"/status\"))           ctx.online  = msg.payload === \"online\";\nelse if (t.endsWith(\"/metrics\"))     ctx.running = !!msg.payload.running;\nelse if (t.endsWith(\"/led/defect\"))  ctx.defect  = String(msg.payload) === \"1\";\nelse return null;\ncontext.set(\"s\", ctx);\n\nlet state, text;\nif (!ctx.online)       { state = \"off\";    text = \"DEVICE OFFLINE\"; }\nelse if (ctx.defect)   { state = \"yellow\"; text = \"PROBLEM: DEFECT\"; }\nelse if (ctx.running)  { state = \"green\";  text = \"PRODUCTION NORMAL\"; }\nelse                   { state = \"red\";    text = \"PRODUCTION STOPPED\"; }\nreturn { payload: { state, text } };",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "n0041"
+      ]
+    ],
+    "id": "n0042",
+    "z": "tab_02",
+    "x": 620,
+    "y": 120
+  },
+  {
+    "type": "ui_gauge",
+    "group": "grp_02_oee",
+    "order": 1,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "OEE",
+    "label": "%",
+    "format": "{{value | number:1}}",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "60",
+    "seg2": "85",
+    "diff": false,
+    "className": "",
+    "name": "OEE",
+    "id": "n0043",
+    "z": "tab_02",
+    "x": 880,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "type": "ui_gauge",
+    "group": "grp_02_oee",
+    "order": 2,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Availability",
+    "label": "%",
+    "format": "{{value | number:1}}",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "60",
+    "seg2": "85",
+    "diff": false,
+    "className": "",
+    "name": "Availability",
+    "id": "n0044",
+    "z": "tab_02",
+    "x": 880,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "type": "ui_gauge",
+    "group": "grp_02_oee",
+    "order": 3,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Performance",
+    "label": "%",
+    "format": "{{value | number:1}}",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "60",
+    "seg2": "85",
+    "diff": false,
+    "className": "",
+    "name": "Performance",
+    "id": "n0045",
+    "z": "tab_02",
+    "x": 880,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "type": "ui_gauge",
+    "group": "grp_02_oee",
+    "order": 4,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Quality",
+    "label": "%",
+    "format": "{{value | number:1}}",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "60",
+    "seg2": "85",
+    "diff": false,
+    "className": "",
+    "name": "Quality",
+    "id": "n0046",
+    "z": "tab_02",
+    "x": 880,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "type": "ui_text",
+    "group": "grp_02_cnt",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "name": "Parts produced",
+    "label": "Parts produced",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": "",
+    "color": "#000000",
+    "id": "n0047",
+    "z": "tab_02",
+    "x": 880,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "type": "ui_text",
+    "group": "grp_02_cnt",
+    "order": 2,
+    "width": 0,
+    "height": 0,
+    "name": "Defects",
+    "label": "Defects",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": "",
+    "color": "#000000",
+    "id": "n0048",
+    "z": "tab_02",
+    "x": 880,
+    "y": 440,
+    "wires": []
+  },
+  {
+    "type": "ui_text",
+    "group": "grp_02_cnt",
+    "order": 3,
+    "width": 0,
+    "height": 0,
+    "name": "Run time",
+    "label": "Run time",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": "",
+    "color": "#000000",
+    "id": "n0049",
+    "z": "tab_02",
+    "x": 880,
+    "y": 480,
+    "wires": []
+  },
+  {
+    "type": "ui_text",
+    "group": "grp_02_cnt",
+    "order": 4,
+    "width": 0,
+    "height": 0,
+    "name": "Planned time",
+    "label": "Planned time",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": "",
+    "color": "#000000",
+    "id": "n0050",
+    "z": "tab_02",
+    "x": 880,
+    "y": 520,
+    "wires": []
+  },
+  {
+    "type": "function",
+    "name": "split metrics",
+    "func": "// metrics JSON -> one message per widget\nconst m = msg.payload;\nconst hms = s => new Date(s * 1000).toISOString().substring(11, 19);\nreturn [\n    { payload: m.oee }, { payload: m.availability }, { payload: m.performance }, { payload: m.quality },\n    { payload: m.cycles }, { payload: m.defects }, { payload: hms(m.runtime) }, { payload: hms(m.planned) }\n];",
+    "outputs": 8,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "n0043"
+      ],
+      [
+        "n0044"
+      ],
+      [
+        "n0045"
+      ],
+      [
+        "n0046"
+      ],
+      [
+        "n0047"
+      ],
+      [
+        "n0048"
+      ],
+      [
+        "n0049"
+      ],
+      [
+        "n0050"
+      ]
+    ],
+    "id": "n0051",
+    "z": "tab_02",
+    "x": 620,
+    "y": 380
+  },
+  {
+    "type": "mqtt in",
+    "name": "metrics",
+    "topic": "lab/line1/m2/metrics",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "lab_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "id": "n0052",
+    "z": "tab_02",
+    "x": 220,
+    "y": 200,
+    "wires": [
+      [
+        "n0042",
+        "n0051"
+      ]
+    ]
+  },
+  {
+    "type": "mqtt in",
+    "name": "status (LWT)",
+    "topic": "lab/line1/m2/status",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "lab_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "id": "n0053",
+    "z": "tab_02",
+    "x": 220,
+    "y": 120,
+    "wires": [
+      [
+        "n0042"
+      ]
+    ]
+  },
+  {
+    "type": "mqtt in",
+    "name": "defect LED",
+    "topic": "lab/line1/m2/led/defect",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "lab_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "id": "n0054",
+    "z": "tab_02",
+    "x": 220,
+    "y": 160,
+    "wires": [
+      [
+        "n0042"
+      ]
+    ]
+  },
+  {
+    "type": "mqtt out",
+    "name": "reset shift",
+    "topic": "lab/line1/m2/cmd/reset",
+    "qos": "",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "lab_broker",
+    "id": "n0055",
+    "z": "tab_02",
+    "x": 620,
+    "y": 580,
+    "wires": []
+  },
+  {
+    "type": "ui_button",
+    "group": "grp_02_cnt",
+    "order": 5,
+    "width": 2,
+    "height": 1,
+    "passthru": false,
+    "label": "Reset shift",
+    "tooltip": "",
+    "color": "",
+    "bgcolor": "#555555",
+    "className": "",
+    "icon": "",
+    "payload": "1",
+    "payloadType": "str",
+    "topic": "",
+    "topicType": "str",
+    "name": "Reset shift",
+    "id": "n0056",
+    "z": "tab_02",
+    "x": 220,
+    "y": 580,
+    "wires": [
+      [
+        "n0055"
+      ]
+    ]
+  },
+  {
+    "type": "comment",
+    "name": "Virtual machine (only when SIMULATE_DEVICE=true): same topics and OEE math as the firmware",
+    "info": "",
+    "id": "n0057",
+    "z": "tab_02",
+    "x": 360,
+    "y": 660,
+    "wires": []
+  },
+  {
+    "type": "mqtt out",
+    "name": "virtual machine",
+    "topic": "",
+    "qos": "",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "lab_broker",
+    "id": "n0058",
+    "z": "tab_02",
+    "x": 880,
+    "y": 720,
+    "wires": []
+  },
+  {
+    "type": "function",
+    "name": "virtual ESP32 machine",
+    "func": "// Virtual machine with the same topics, counters and OEE math as\n// firmware/esp32_machine_control. Ticks once per second.\nif (env.get(\"SIMULATE_DEVICE\") !== \"true\") return null;\nconst B = \"lab/line1/m2\";\nconst IDEAL_CYCLE_S = 10;\nconst now = Date.now();\nlet m = flow.get(\"vm\");\nif (!m || msg.topic === B + \"/cmd/reset\") {\n    const running = m ? m.running : false;\n    m = { running, cycles: 0, defects: 0, runtimeMs: 0, shiftStart: now, last: now,\n          nextToggle: now + 15000, partTimer: 0, defectLedUntil: 0 };\n}\nconst out = [];\nconst dt = now - m.last; m.last = now;\n\nif (now >= m.nextToggle) {                       // run ~60 s, stop ~15 s\n    m.running = !m.running;\n    m.nextToggle = now + (m.running ? 45000 + Math.random() * 30000 : 10000 + Math.random() * 10000);\n    out.push({ topic: B + \"/led/start\", payload: m.running ? \"1\" : \"0\", retain: true });\n    out.push({ topic: B + \"/led/stop\",  payload: m.running ? \"0\" : \"1\", retain: true });\n}\nif (m.running) {\n    m.runtimeMs += dt;\n    m.partTimer += dt;\n    const cycleMs = IDEAL_CYCLE_S * 1000 * (1.1 + Math.random() * 0.3);   // a bit slower than ideal\n    if (m.partTimer >= cycleMs) {\n        m.partTimer = 0;\n        m.cycles += 1;\n        if (Math.random() < 0.05 && m.defects < m.cycles) {\n            m.defects += 1;\n            m.defectLedUntil = now + 3000;\n            out.push({ topic: B + \"/led/defect\", payload: \"1\", retain: true });\n        }\n    }\n}\nif (m.defectLedUntil && now > m.defectLedUntil) {\n    m.defectLedUntil = 0;\n    out.push({ topic: B + \"/led/defect\", payload: \"0\", retain: true });\n}\nflow.set(\"vm\", m);\n\nconst runtime = Math.floor(m.runtimeMs / 1000);\nconst planned = Math.floor((now - m.shiftStart) / 1000);\nconst A = planned > 0 ? Math.min(runtime / planned, 1) : 0;\nconst P = runtime > 0 ? Math.min(m.cycles * IDEAL_CYCLE_S / runtime, 1) : 0;\nconst Q = m.cycles > 0 ? (m.cycles - m.defects) / m.cycles : 1;\nconst r1 = x => Math.round(x * 1000) / 10;\nout.push({ topic: B + \"/status\", payload: \"online\", retain: true });\nout.push({ topic: B + \"/metrics\", retain: true, payload: JSON.stringify({\n    running: m.running, cycles: m.cycles, defects: m.defects, runtime, planned,\n    availability: r1(A), performance: r1(P), quality: r1(Q), oee: r1(A * P * Q) }) });\nreturn [out];",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "wires": [
+      [
+        "n0058"
+      ]
+    ],
+    "id": "n0059",
+    "z": "tab_02",
+    "x": 620,
+    "y": 720
+  },
+  {
+    "type": "inject",
+    "name": "tick 1 s",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "1",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "id": "n0060",
+    "z": "tab_02",
+    "x": 220,
+    "y": 720,
+    "wires": [
+      [
+        "n0059"
+      ]
+    ]
+  },
+  {
+    "type": "mqtt in",
+    "name": "reset command",
+    "topic": "lab/line1/m2/cmd/reset",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "lab_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "id": "n0061",
+    "z": "tab_02",
+    "x": 220,
+    "y": 770,
+    "wires": [
+      [
+        "n0059"
+      ]
+    ]
+  }
+]

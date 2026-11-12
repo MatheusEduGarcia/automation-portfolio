@@ -458,7 +458,7 @@ node-red
 
 2. Selecione: **Import → Clipboard**
 
-3. **Abra o arquivo**: `flows/andon_tower_flow.json`
+3. **Abra o arquivo**: `flows/andon-oee.flow.json`
 
 4. **Copie TODO o conteúdo** (Ctrl+A, Ctrl+C)
 
@@ -723,7 +723,7 @@ npm install -g node-red-dashboard
 **Soluções:**
 1. Verifique tópicos MQTT:
 ```bash
-mosquitto_sub -h localhost -t "lab/line1/m1/#" -v
+mosquitto_sub -h localhost -t "lab/line1/m2/#" -v
 ```
 
 2. Confira broker configurado no Node-RED

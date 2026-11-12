@@ -1,0 +1,23 @@
+name: iiot-lab
+
+# Mosquitto + Node-RED with the flows of projects 01 and 02 preloaded.
+# SIMULATE_DEVICE=true runs virtual ESP32s, so everything works without hardware.
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+    restart: unless-stopped
+
+  node-red:
+    build: ./node-red
+    environment:
+      MQTT_HOST: mosquitto
+      SIMULATE_DEVICE: ${SIMULATE_DEVICE:-true}
+      TZ: America/Sao_Paulo
+    ports:
+      - "1880:1880"
+    depends_on: [mosquitto]
+    restart: unless-stopped
