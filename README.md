@@ -1,5 +1,7 @@
 # Automation Portfolio · Industrial Automation | IIoT | Industry 4.0
 
+[![CI](https://github.com/MatheusEduGarcia/automation-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/MatheusEduGarcia/automation-portfolio/actions/workflows/ci.yml)
+
 Hands-on projects in industrial automation, IIoT and industrial data: from
 PLC logic and embedded devices on the shop floor to MQTT, historians and
 dashboards on the IT side.
@@ -25,14 +27,22 @@ of the PLC so the whole stack runs with `docker compose up`.
 
 ## Projects in this repository
 
-| # | Project | Stack | Status |
+| # | Project | What it shows | Stack |
 |---|---|---|---|
-| 01 | [ESP32 + MQTT Practical](projects/01-esp32-mqtt-practical/) | ESP32, Mosquitto, Node-RED, MQTT Explorer | Phase 0 (local) done |
-| 02 | [ESP32 MQTT Andon System](projects/02-esp32-mqtt-andon-system/) | ESP32, MQTT, Node-RED Dashboard | Lab prototype |
-| 03 | [Node-RED Flows](projects/03-node-red-flows/) | Node-RED | Reusable flows |
+| 01 | [ESP32 Remote I/O over MQTT](projects/01-esp32-mqtt-remote-io/) | 8 in / 8 out over MQTT with command confirmation, Last Will, machine telemetry simulator | ESP32, MQTT, Node-RED |
+| 02 | [ESP32 Andon Tower + OEE](projects/02-esp32-mqtt-andon-system/) | Operator station computing Availability, Performance, Quality and OEE on the device, Andon dashboard | ESP32, MQTT, Node-RED Dashboard |
+| 03 | [Node-RED IIoT Lab](projects/03-node-red-iiot-lab/) | `docker compose up` runs 01 and 02 with virtual ESP32s, no hardware needed | Docker, Mosquitto, Node-RED |
 
-Each project folder has its own README with objective, architecture, how to
-run and screenshots.
+![Andon and OEE dashboard](projects/02-esp32-mqtt-andon-system/images/dashboard-andon-oee.png)
+
+### Try it in one minute
+
+```bash
+git clone https://github.com/MatheusEduGarcia/automation-portfolio.git
+cd automation-portfolio/projects/03-node-red-iiot-lab
+docker compose up -d --build
+# open http://localhost:1880/ui
+```
 
 ## Firmware credentials
 

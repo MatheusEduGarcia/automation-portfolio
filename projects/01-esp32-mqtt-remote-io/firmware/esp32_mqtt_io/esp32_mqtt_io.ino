@@ -68,46 +68,60 @@ String topicOutSet(int i) {
 String topicOutState(int i) {
   return String(TOPIC_BASE) + "/io/out/" + String(i);
 }
+String topicStatus() {
+  return String(TOPIC_BASE) + "/io/status";   // online / offline (LWT)
+}
+
+void publishOutState(int i, int v, bool retained);
+
+const unsigned long WIFI_TIMEOUT_MS = 15000;
+const unsigned long MQTT_RETRY_MS   = 2000;
+unsigned long lastMqttTry = 0;
 
 void wifiConnect() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   Serial.print("WiFi connecting");
+  unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    if (millis() - t0 > WIFI_TIMEOUT_MS) {   // give the loop a chance, retry later
+      Serial.println("\nWiFi timeout, will retry");
+      return;
+    }
   }
   Serial.println("\nWiFi connected");
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 }
 
-void mqttConnect() {
-  while (!mqtt.connected()) {
-    String clientId = "esp32-io-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-    Serial.print("MQTT connecting as ");
-    Serial.println(clientId);
+// One connection attempt; the loop retries every MQTT_RETRY_MS without
+// blocking, so buttons keep being scanned while the broker is down.
+bool mqttConnect() {
+  String clientId = "esp32-io-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  Serial.print("MQTT connecting as ");
+  Serial.println(clientId);
 
-    if (mqtt.connect(clientId.c_str())) {
-      Serial.println("MQTT connected");
-
-      // Subscribe comandos para acender/apagar saídas
-      for (int i = 0; i < NUM_CANAIS; i++) {
-        mqtt.subscribe(topicOutSet(i).c_str(), 0);
-      }
-
-      // Publica estado inicial das saídas (retained)
-      for (int i = 0; i < NUM_CANAIS; i++) {
-        publishOutState(i, digitalRead(saidas[i]) == HIGH ? 1 : 0, true);
-      }
-
-    } else {
-      Serial.print("MQTT failed, rc=");
-      Serial.println(mqtt.state());
-      delay(1000);
-    }
+  String will = topicStatus();
+  if (!mqtt.connect(clientId.c_str(), will.c_str(), 1, true, "offline")) {
+    Serial.print("MQTT failed, rc=");
+    Serial.println(mqtt.state());
+    return false;
   }
+  Serial.println("MQTT connected");
+  mqtt.publish(will.c_str(), "online", true);
+
+  // Subscribe to output commands
+  for (int i = 0; i < NUM_CANAIS; i++) {
+    mqtt.subscribe(topicOutSet(i).c_str(), 0);
+  }
+  // Publish current output states (retained)
+  for (int i = 0; i < NUM_CANAIS; i++) {
+    publishOutState(i, digitalRead(saidas[i]) == HIGH ? 1 : 0, true);
+  }
+  return true;
 }
 
 int payloadTo01(const byte* payload, unsigned int len) {
@@ -127,6 +141,7 @@ int payloadTo01(const byte* payload, unsigned int len) {
 void publishIn(int i, int v) {
   // v: 1 pressionado, 0 solto (momentâneo)
   // ou v: estado lógico (toggle)
+  if (!mqtt.connected()) return;
   String t = topicIn(i);
   char payload[2] = {(char)(v ? '1' : '0'), '\0'};
   mqtt.publish(t.c_str(), payload, false);
@@ -184,7 +199,7 @@ void setup() {
   wifiConnect();
   mqtt.setServer(BROKER_HOST, BROKER_PORT);
   mqtt.setCallback(onMqttMessage);
-  mqttConnect();
+  if (WiFi.status() == WL_CONNECTED) mqttConnect();
 
   Serial.printf("Mode: %s\n", MODO_TOGGLE ? "TOGGLE" : "MOMENTARY");
   Serial.println("Ready.");
@@ -192,7 +207,12 @@ void setup() {
 
 void loop() {
   if (WiFi.status() != WL_CONNECTED) wifiConnect();
-  if (!mqtt.connected()) mqttConnect();
+  if (WiFi.status() == WL_CONNECTED && !mqtt.connected()) {
+    if (millis() - lastMqttTry > MQTT_RETRY_MS) {
+      lastMqttTry = millis();
+      mqttConnect();
+    }
+  }
   mqtt.loop();
 
   for (int i = 0; i < NUM_CANAIS; i++) {

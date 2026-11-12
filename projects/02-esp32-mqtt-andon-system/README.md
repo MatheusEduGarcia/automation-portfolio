@@ -1,428 +1,109 @@
-# 🚨 ESP32 MQTT Machine Control com Sistema Andon
+# 02 · ESP32 Andon Tower + OEE over MQTT
 
-> Sistema de controle industrial com torre Andon visual, monitoramento em tempo real e integração MQTT para Industry 4.0
-
-![ESP32](https://img.shields.io/badge/ESP32-Supported-green?logo=espressif)
-![Node-RED](https://img.shields.io/badge/Node--RED-v3.0+-red?logo=nodered)
-![MQTT](https://img.shields.io/badge/MQTT-v3.1.1-blue)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![ESP32](https://img.shields.io/badge/ESP32-Arduino-blue?logo=espressif)
+![MQTT](https://img.shields.io/badge/MQTT-3.1.1-660066)
+![Node-RED](https://img.shields.io/badge/Node--RED-4.0-8F0000?logo=nodered)
 ![Status](https://img.shields.io/badge/Status-Lab%20prototype-blue)
 
----
+An ESP32 machine station with four operator buttons (Start, Stop, Output,
+Defect) that counts parts and defects, computes **OEE** on the device and
+publishes it over MQTT. A Node-RED dashboard shows an **Andon tower** and the
+OEE breakdown in real time.
 
-## 📸 Sistema em Funcionamento
+![Andon and OEE dashboard](images/dashboard-andon-oee.png)
 
-**Torre Andon Visual:**
+*Dashboard running with the virtual machine (no hardware needed), see
+[03 · IIoT Lab](../03-node-red-iiot-lab/).*
 
-```
-       ┌─────────┐
-       │   🔴    │  ← Production Stopped
-       ├─────────┤
-       │   🟡    │  ← Problem Appeared  
-       ├─────────┤
-       │   🟢    │  ← Production Normal (Active)
-       └────┬────┘
-            │
-         ───┴───
-```
+## What it does
 
-**Dashboard Node-RED:**
-- Torre Andon 3D com animações
-- Contadores de Output e Defects em tempo real
-- Gauge de Quality (0-100%)
-- Monitoramento de conexão ESP32
+* **Andon logic** with priority: offline (grey) > defect (yellow) >
+  running (green) > stopped (red). Offline comes from the MQTT Last Will.
+* **Shift counters**: parts, defects, run time and planned time.
+* **OEE = Availability × Performance × Quality**, calculated on the ESP32:
 
----
+| Factor | Formula | Source |
+|---|---|---|
+| Availability | run time / planned time | Start and Stop buttons, planned time = time since shift start |
+| Performance | parts × ideal cycle time / run time | Output button, `IDEAL_CYCLE_S` in the firmware (10 s) |
+| Quality | (parts − defects) / parts | Defect button marks one produced part as scrap |
 
-## ✨ Features Principais
+* **Reset shift** from the dashboard (`cmd/reset`) zeroes the counters and
+  starts a new planned time window.
 
-### 🎯 Sistema Andon Completo
-- **🟢 Verde**: Produção normal (máquina rodando)
-- **🟡 Amarelo**: Problema detectado (defeito identificado)
-- **🔴 Vermelho**: Produção parada (máquina idle/stopped)
-- Lógica de prioridade: Defeito > Rodando > Parado
+## Architecture
 
-### 📊 Monitoramento em Tempo Real
-- Contador de ciclos produzidos (Output)
-- Contador de defeitos detectados
-- Cálculo automático de Quality (%)
-- Runtime acumulado da máquina
-- Status de conexão ESP32
-
-### ⚡ Comunicação MQTT
-- Publicação de eventos de botões
-- Estados dos LEDs (retained)
-- Métricas em formato JSON
-- Last Will Testament (LWT)
-- Auto-reconexão WiFi/MQTT
-
-### 🎨 Interface Visual Profissional
-- Torre Andon com efeitos 3D
-- Animações de pulsação por estado
-- Gradientes radiais e glow effects
-- Design responsivo (desktop/tablet/mobile)
-- Dashboard customizável
-
----
-
-## 🎯 Casos de Uso
-
-Este sistema é ideal para:
-
-- **Linhas de Montagem**: Monitorar status de produção em tempo real
-- **Células de Usinagem**: Detectar problemas de qualidade e paradas
-- **Controle de Qualidade**: Rastrear defeitos e calcular quality metrics
-- **Fundições**: Acompanhar ciclos e identificar não-conformidades
-- **Industry 4.0**: Base para sistemas OEE e MES
-
----
-
-## 🛠️ Hardware Necessário
-
-### Componentes Principais
-- **1x ESP32 Dev Module** (30 pinos)
-- **4x Botões tácteis** (Push-button)
-- **4x LEDs** (Verde, Vermelho, Azul, Amarelo)
-- **4x Resistores 220Ω** (para LEDs)
-- **Jumpers macho-macho**
-- **Protoboard** (opcional, para testes)
-
-### Mapeamento de Pinos
-
-| Componente | GPIO | Função |
-|------------|------|--------|
-| Botão START | 32 | Iniciar produção |
-| Botão STOP | 33 | Parar produção |
-| Botão OUTPUT | 4 | Registrar ciclo |
-| Botão DEFECT | 15 | Detectar defeito |
-| LED START (Verde) | 23 | Indicador Start |
-| LED STOP (Vermelho) | 16 | Indicador Stop |
-| LED OUTPUT (Azul) | 17 | Indicador Output |
-| LED DEFECT (Amarelo) | 19 | Indicador Defect |
-
-**Conexão dos Botões:** Pull-up interno (LOW = pressionado)  
-**Conexão dos LEDs:** Lógica positiva (HIGH = aceso)
-
----
-
-## 📋 Pré-requisitos
-
-### Software
-- **Arduino IDE 2.x** ou superior
-- **Node-RED 3.0+** instalado
-- **Broker MQTT** (Mosquitto recomendado)
-- **Node.js** (para Node-RED)
-
-### Bibliotecas Arduino
-- **WiFi.h** (nativa ESP32)
-- **PubSubClient** (Nick O'Leary)
-
-### Pacotes Node-RED
-- **node-red-dashboard** (UI components)
-
----
-
-## 🚀 Quick Start (5 Minutos)
-
-### 1️⃣ Upload Firmware ESP32
-```bash
-1. Abra: firmware/esp32_machine_control/esp32_machine_control.ino
-   (copie `secrets.example.h` para `secrets.h` na mesma pasta e preencha Wi-Fi e IP do broker)
-2. Edite WiFi SSID e senha (linhas 12-14)
-3. Edite IP do broker MQTT (linha 16)
-4. Tools → Board → ESP32 Dev Module
-5. Upload (Ctrl+U)
+```mermaid
+flowchart LR
+    BTN["Buttons<br/>Start · Stop · Output · Defect"] --> ESP["ESP32<br/>counters + OEE"]
+    ESP --> LED["Local LEDs"]
+    ESP -- "metrics JSON, LED states,<br/>status (LWT)" --> MQ[("Mosquitto")]
+    MQ --> NR["Node-RED<br/>Andon logic"]
+    NR --> UI["Dashboard<br/>tower + OEE gauges"]
+    UI -- "cmd/reset" --> MQ --> ESP
 ```
 
-### 2️⃣ Configurar Node-RED
-```bash
-1. Abra Node-RED: http://localhost:1880
-2. Menu → Import → Clipboard
-3. Cole o conteúdo de: flows/andon_tower_flow.json
-4. Deploy
-```
+## Hardware
 
-### 3️⃣ Acessar Dashboard
-```
-URL: http://localhost:1880/ui
-Tab: Andon System
-```
+| Component | GPIO | Notes |
+|---|---|---|
+| Button START | 32 | internal pull-up, LOW = pressed |
+| Button STOP | 33 | |
+| Button OUTPUT (part done) | 4 | |
+| Button DEFECT | 15 | |
+| LED START (green) | 23 | 220 Ω |
+| LED STOP (red) | 16 | 220 Ω |
+| LED OUTPUT (blue) | 17 | toggles on each part |
+| LED DEFECT (yellow) | 19 | on for 3 s after a defect |
 
-### 4️⃣ Testar
-```
-- Pressione START → Torre fica 🟢 Verde
-- Pressione OUTPUT → Contador incrementa
-- Pressione DEFECT → Torre fica 🟡 Amarelo (3s)
-- Pressione STOP → Torre fica 🔴 Vermelho
-```
+## MQTT topics
 
-✅ **Pronto! Sistema funcionando!**
+Base: `lab/line1/m2`
 
----
+| Topic | Direction | Payload | Retained |
+|---|---|---|---|
+| `…/metrics` | ESP32 → | `{"running":true,"cycles":42,"defects":2,"runtime":510,"planned":600,"availability":85.0,"performance":82.4,"quality":95.2,"oee":66.7}` | yes |
+| `…/status` | ESP32 → | `online` / `offline` (Last Will) | yes |
+| `…/led/{start,stop,output,defect}` | ESP32 → | `0` / `1` | yes |
+| `…/button/{start,stop,output,defect}` | ESP32 → | `0` / `1` (press events) | no |
+| `…/led/{name}/set` | → ESP32 | `0` / `1` | no |
+| `…/cmd/reset` | → ESP32 | anything, resets the shift | no |
 
-## 📚 Documentação Completa
+## How to run
 
-### 📖 Guias Detalhados
-- **[Installation Guide](docs/INSTALLATION.md)** - Passo a passo completo de instalação
-- **[Andon System Explained](docs/ANDON_SYSTEM.md)** - Conceitos e funcionamento do Andon
+**Without hardware:** start the [IIoT Lab](../03-node-red-iiot-lab/) and open
+http://localhost:1880/ui. A virtual machine publishes the same topics with
+the same OEE math.
 
-### 🔧 Recursos Adicionais
-- **Troubleshooting** - Ver seção abaixo
-- **MQTT Topics** - Ver seção abaixo
-- **API Reference** - Métricas JSON
+**With an ESP32:**
 
----
+1. Open `firmware/esp32_machine_control/esp32_machine_control.ino` in Arduino
+   IDE 2 (board: ESP32 Dev Module, library: PubSubClient).
+2. Copy `secrets.example.h` to `secrets.h` in the same folder and set Wi-Fi
+   and the broker IP. `secrets.h` is ignored by git.
+3. Upload, open the Serial Monitor at 115200 baud.
+4. Run the lab with `SIMULATE_DEVICE=false` so the virtual machine does not
+   publish on top of the real one.
 
-## 📊 Arquitetura do Sistema
+To use only the dashboard on an existing Node-RED: install
+`node-red-dashboard`, then **Import** [`flows/andon-oee.flow.json`](flows/andon-oee.flow.json)
+and set the environment variable `MQTT_HOST` (or edit the broker node).
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    ESP32 (Embedded)                      │
-│  ┌──────────┐    ┌──────────────┐    ┌──────────┐      │
-│  │ Botões   │───▶│  State       │───▶│   LEDs   │      │
-│  │ Físicos  │    │  Machine     │    │  Físicos │      │
-│  └──────────┘    │  + Metrics   │    └──────────┘      │
-│                   └──────┬───────┘                       │
-└──────────────────────────┼─────────────────────────────┘
-                           │ MQTT (WiFi)
-                           ▼
-              ┌────────────────────────┐
-              │    Mosquitto Broker    │
-              └────────┬───────────────┘
-                       │ Subscribe/Publish
-                       ▼
-              ┌────────────────────────┐
-              │      Node-RED          │
-              │  ┌──────────────────┐  │
-              │  │  Andon Logic     │  │
-              │  │  Torre Visual    │  │
-              │  │  Metrics Display │  │
-              │  └──────────────────┘  │
-              └────────────────────────┘
-                       │
-                       ▼
-              ┌────────────────────────┐
-              │  Dashboard UI (Browser)│
-              │  http://localhost:1880 │
-              └────────────────────────┘
-```
-
----
-
-## 📡 Tópicos MQTT
-
-### Publicados pelo ESP32
-
-| Tópico | Payload | Retained | Descrição |
-|--------|---------|----------|-----------|
-| `lab/line1/m1/button/start` | `0` / `1` | ❌ | Evento botão Start |
-| `lab/line1/m1/button/stop` | `0` / `1` | ❌ | Evento botão Stop |
-| `lab/line1/m1/button/output` | `0` / `1` | ❌ | Evento botão Output |
-| `lab/line1/m1/button/defect` | `0` / `1` | ❌ | Evento botão Defect |
-| `lab/line1/m1/led/start` | `0` / `1` | ✅ | Estado LED Start |
-| `lab/line1/m1/led/stop` | `0` / `1` | ✅ | Estado LED Stop |
-| `lab/line1/m1/led/output` | `0` / `1` | ✅ | Estado LED Output |
-| `lab/line1/m1/led/defect` | `0` / `1` | ✅ | Estado LED Defect |
-| `lab/line1/m1/metrics` | `JSON` | ✅ | Métricas completas |
-| `lab/line1/m1/status` | `online` / `offline` | ✅ | Status ESP32 (LWT) |
-
-### Subscritos pelo ESP32
-
-| Tópico | Payload | Descrição |
-|--------|---------|-----------|
-| `lab/line1/m1/led/start/set` | `0` / `1` | Comando LED Start |
-| `lab/line1/m1/led/stop/set` | `0` / `1` | Comando LED Stop |
-| `lab/line1/m1/led/output/set` | `0` / `1` | Comando LED Output |
-| `lab/line1/m1/led/defect/set` | `0` / `1` | Comando LED Defect |
-
-### Estrutura JSON de Métricas
-
-```json
-{
-  "running": true,
-  "cycles": 42,
-  "defects": 2,
-  "runtime": 1254,
-  "quality": 95.2
-}
-```
-
----
-
-## 🎨 Customização
-
-### Mudar Base do Tópico MQTT
-```cpp
-// No firmware ESP32
-static const char* TOPIC_BASE = "lab/line1/m1";
-// Mude para: "fabrica/linha2/torno1"
-```
-
-### Ajustar Debounce dos Botões
-```cpp
-// No firmware ESP32
-static const uint32_t DEBOUNCE_MS = 50;
-// Aumente se houver bouncing
-```
-
-### Personalizar Cores da Torre Andon
-```javascript
-// No Node-RED template node
-background: radial-gradient(circle, #FF0000, #AA0000);  // Vermelho
-background: radial-gradient(circle, #FFFF00, #CCCC00);  // Amarelo
-background: radial-gradient(circle, #00FF00, #00AA00);  // Verde
-```
-
----
-
-## 🐛 Troubleshooting
-
-### ESP32 não conecta no WiFi
-```
-✅ Verificar SSID e senha corretos
-✅ WiFi 2.4GHz (ESP32 não suporta 5GHz)
-✅ Testar alcance do sinal
-✅ Ver Serial Monitor (115200 baud)
-```
-
-### MQTT não conecta
-```
-✅ Broker está rodando? (systemctl status mosquitto)
-✅ Firewall bloqueando porta 1883?
-✅ IP do broker correto no firmware?
-✅ Testar: mosquitto_sub -h localhost -t "#" -v
-```
-
-### Dashboard não atualiza
-```
-✅ Node-RED está rodando?
-✅ Deploy foi executado?
-✅ node-red-dashboard instalado?
-✅ Verificar debug nodes no Node-RED
-```
-
-### LEDs não acendem
-```
-✅ Resistores conectados corretamente?
-✅ Polaridade do LED correta?
-✅ GPIO correto no código?
-✅ Testar com digitalWrite direto
-```
-
-### Erro de compilação
-```
-✅ ESP32 board package instalado?
-✅ Biblioteca PubSubClient instalada?
-✅ Porta COM selecionada?
-✅ Segurar botão BOOT durante upload
-```
-
----
-
-## 📈 Roadmap (Próximas Versões)
-
-### v2.0 - Database Integration
-- [ ] MySQL/InfluxDB storage
-- [ ] Historical data logging
-- [ ] Trend charts (Grafana)
-
-### v3.0 - Advanced OEE
-- [ ] Availability calculation
-- [ ] Performance metrics
-- [ ] Complete OEE dashboard
-
-### v4.0 - Multi-Machine
-- [ ] Support for multiple ESP32s
-- [ ] Grid view of Andon towers
-- [ ] Aggregated metrics
-
-### v5.0 - Integrations
-- [ ] ERP/MES integration
-- [ ] Telegram/Email alerts
-- [ ] Mobile app (React Native)
-
----
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/NovaFeature`)
-3. Commit suas mudanças (`git commit -m 'Add: Nova feature'`)
-4. Push para a branch (`git push origin feature/NovaFeature`)
-5. Abra um Pull Request
-
-**Áreas para contribuir:**
-- Melhorias no dashboard
-- Novos recursos de métricas
-- Integrações com outros sistemas
-- Documentação
-- Tradução para outros idiomas
-
----
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](../../LICENSE) para mais detalhes.
+## Files
 
 ```
-MIT License - Você pode usar, modificar e distribuir livremente
+firmware/esp32_machine_control/   Arduino sketch + secrets.example.h
+flows/andon-oee.flow.json         Node-RED flow: Andon logic, OEE gauges, virtual machine
+images/                           Screenshots and the original wiring/architecture images
+docs/ANDON_SYSTEM.md              Andon concept, history and use cases (pt-BR)
+docs/INSTALLATION.md              Step-by-step install guide (pt-BR)
 ```
 
----
+## Limitations and next steps
 
-## 👤 Autor
-
-**Matheus Garcia**
-- 🏢 Senior Automation Engineer.
-- 🎯 Digital Transformation & Innovation
-- 🌍 São Paulo, Brazil
-
-**Expertise:**
-- Industrial IoT & Industry 4.0
-- MQTT & Node-RED
-- ESP32 Development
-- OEE Monitoring Systems
-- Digital Transformation
-
----
-
-## 🙏 Agradecimentos
-
-- **Toyota Production System** - Conceito Andon original
-- **Espressif** - ESP32 platform
-- **Node-RED Community** - Dashboard components
-- **Eclipse Mosquitto** - MQTT broker
-
----
-
-## 📞 Suporte
-
-**Encontrou um bug?** Abra uma [Issue](https://github.com/SEU_USERNAME/esp32-mqtt-andon-system/issues)
-
-**Tem uma dúvida?** Use as [Discussions](https://github.com/SEU_USERNAME/esp32-mqtt-andon-system/discussions)
-
-**Quer compartilhar seu projeto?** Marque com `#ESP32Andon` nas redes sociais
-
----
-
-## ⭐ Star History
-
-Se este projeto foi útil para você, considere dar uma ⭐!
-
----
-
-**Versão:** 1.0.0  
-**Status:** Production Ready ✅  
-**Última Atualização:** Janeiro 2025
-
----
-
-<div align="center">
-
-Made with ❤️ for Industry 4.0
-
-[⬆ Voltar ao topo](#-esp32-mqtt-machine-control-com-sistema-andon)
-
-</div>
+* Counters live in RAM, so a power cycle loses the shift. Next: persist with
+  `Preferences` (NVS).
+* Planned time is "time since shift start", with no planned breaks.
+* Next: downtime reasons (a stop button per reason) and history in a
+  time-series database, as in
+  [compressed-air-plant-opcua](https://github.com/MatheusEduGarcia/compressed-air-plant-opcua).
